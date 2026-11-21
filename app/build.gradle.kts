@@ -183,6 +183,19 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+        // Fork 专用测试包：官方「轻量发布包」预设的口径（initWith(release)：代码压缩 + 资源裁剪 + 无内置模型），
+        // 另给并存身份，可以和原版一起装机试用，不覆盖、不清数据。只在 -PcandidatePreview=true 时才加测试后缀，
+        // 普通 release 不动。签名：本地有正式密钥就用它，CI 没有则用机器上的 debug 密钥，保证能直接装。
+        create("preview") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            if (candidatePreview) {
+                applicationIdSuffix = ".commenttest"
+                resValue("string", "app_name", "CyIME 注释测试")
+            }
+            signingConfig = if (keystorePropertiesFile.exists()) signingConfigs.getByName("release")
+                else signingConfigs.getByName("debug")
+        }
         // 离线构建类型：initWith(release)，由 src/offline 的 manifest 叠加层移除 INTERNET 权限。
         // 产物（assembleOffline）供高敏感环境使用：系统层面禁止一切联网，模型/词库下载、
         // 扩展商店、检查更新、在线语音、样本贡献、剪贴板同步在该构建中均不可用，

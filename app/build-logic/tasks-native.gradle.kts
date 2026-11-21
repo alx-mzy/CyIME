@@ -22,7 +22,8 @@ val ghMirrors = listOf(
 // 单个 URL 下载，支持断点续传与自动重试
 fun downloadFile(url: String, target: File, workDir: File, desc: String): Boolean {
     println("Downloading $desc: $url")
-    repeat(5) { attempt ->
+    repeat(2) { attempt ->
+        var httpFailure = false
         try {
             if (downloadOnce(url, target, desc)) {
                 if (target.exists() && target.length() == 0L) {
@@ -32,12 +33,15 @@ fun downloadFile(url: String, target: File, workDir: File, desc: String): Boolea
                 println("Downloaded ${target.name} (${target.length()} bytes)")
                 return true
             }
+            httpFailure = true
         } catch (e: Exception) {
             System.err.println("Download error for $desc: ${e.message}")
         }
         // 失败后清空残留半成品，避免续传污染下一源
         target.delete()
-        if (attempt < 4) Thread.sleep(3000)
+        // HTTP 层失败（404/403）：这个源就是没有，换下一个，不要反复等同一个 URL。
+        if (httpFailure) return false
+        if (attempt < 1) Thread.sleep(1500)
     }
     return false
 }
@@ -90,19 +94,27 @@ fun downloadWithMirrors(urls: List<String>, target: File, workDir: File, desc: S
 }
 
 fun githubUrls(url: String): List<String> = buildList {
-    ghMirrors.forEach { add("${it.trimEnd('/')}/$url") }
-    // jsDelivr 直接按 tag 取 raw 文件；上面几个代理对 raw 路径常返回 404（本地和部分 CI 环境）。
+    // jsDelivr 直接按 tag 取 raw 文件，实测可用（本地与 CI 均是秒级 200），排最前。
     val rawPrefix = "https://raw.githubusercontent.com/"
-    if (url.startsWith(rawPrefix)) {
-        val parts = url.removePrefix(rawPrefix).split('/')
-        if (parts.size >= 4) {
-            val repo = "${parts[0]}/${parts[1]}"
-            val tag = parts[2]
-            val path = parts.drop(3).joinToString("/")
-            add("https://cdn.jsdelivr.net/gh/$repo@$tag/$path")
-        }
+    val rawParts = url.takeIf { it.startsWith(rawPrefix) }?.removePrefix(rawPrefix)?.split('/')
+    if (rawParts != null && rawParts.size >= 4) {
+        val repo = "${rawParts[0]}/${rawParts[1]}"
+        val tag = rawParts[2]
+        val path = rawParts.drop(3).joinToString("/")
+        add("https://cdn.jsdelivr.net/gh/$repo@$tag/$path")
     }
+    // 代理兜底：对 raw 路径经常 404（本地与部分 CI 环境），排在 jsDelivr 后面。
+    ghMirrors.forEach { add("${it.trimEnd('/')}/$url") }
     add(url) // 官方源兜底
+}
+
+/** 代理有时会用 200 回一张 HTML 错误页，头文件必须像 C 源文件，别把垃圾写进去。 */
+fun looksLikeHeader(file: File): Boolean {
+    if (!file.exists() || file.length() == 0L) return false
+    val chars = CharArray(400)
+    val read = file.bufferedReader().use { it.read(chars) }
+    val head = if (read > 0) String(chars, 0, read) else ""
+    return !head.contains("<!DOCTYPE", ignoreCase = true) && !head.contains("<html", ignoreCase = true)
 }
 
 val downloadOnnx by tasks.registering {
@@ -185,14 +197,22 @@ val downloadOnnx by tasks.registering {
         dstHeaders.listFiles()?.forEach { old ->
             if (old.isFile) old.delete()
         }
+        val missingHeaders = mutableListOf<String>()
         for (rel in headersToFetch) {
             val target = java.io.File(dstHeaders, rel.substringAfterLast("/"))
             val url = "$onnxHeadersBase/$rel"
-            if (downloadWithMirrors(githubUrls(url), target, buildDir, "onnxruntime header $rel")) {
+            if (downloadWithMirrors(githubUrls(url), target, buildDir, "onnxruntime header $rel") && looksLikeHeader(target)) {
                 println("Header ok: ${target.name}")
             } else {
+                target.delete()
+                missingHeaders += rel
                 System.err.println("WARNING: failed to fetch header $rel")
             }
+        }
+        // 头文件缺了就不能写「已部署」标记：以前只 warning，构建成功但 native 编不过，问题被藏起来。
+        if (missingHeaders.isNotEmpty()) {
+            throw GradleException("Missing ONNX Runtime headers (${missingHeaders.size}/${headersToFetch.size}): " +
+                missingHeaders.joinToString(", ") + " — 检查网络或 jsDelivr 可用性后重新运行 downloadOnnx")
         }
 
         // 4. Marker

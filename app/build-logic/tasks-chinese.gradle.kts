@@ -166,15 +166,33 @@ val prepareChineseDictionaries by tasks.registering {
             check(!gradle.startParameter.isOffline) { "Run prepareChineseDictionaries once online." }
             archive.parentFile.mkdirs()
             val pending = File(archive.parentFile, "${archive.name}.download")
-            val connection = URI("https://codeload.github.com/iDvel/rime-ice/zip/$chineseRevision").toURL().openConnection() as HttpURLConnection
-            connection.connectTimeout = 30000
-            connection.readTimeout = 600000
-            try {
-                check(connection.responseCode == 200)
-                connection.inputStream.use { i -> pending.outputStream().use { i.copyTo(it) } }
-                check(chineseSha(pending) == chineseArchiveSha) { "Chinese dictionary checksum mismatch" }
-                pending.copyTo(archive, overwrite = true)
-            } finally { connection.disconnect(); pending.delete() }
+            // 直连 codeload 在部分网络（本机实测 404）不通，用 GitHub 代理兜底；内容仍按 sha256 校验。
+            val sources = listOf(
+                "https://codeload.github.com/iDvel/rime-ice/zip/$chineseRevision",
+                "https://gh-proxy.com/https://codeload.github.com/iDvel/rime-ice/zip/$chineseRevision",
+            )
+            var downloaded = false
+            for (source in sources) {
+                if (downloaded) break
+                val connection = URI(source).toURL().openConnection() as HttpURLConnection
+                connection.connectTimeout = 30000
+                connection.readTimeout = 600000
+                try {
+                    val code = connection.responseCode
+                    if (code != 200) {
+                        System.err.println("Chinese dictionary source failed: $source (HTTP $code)")
+                        continue
+                    }
+                    connection.inputStream.use { i -> pending.outputStream().use { i.copyTo(it) } }
+                    check(chineseSha(pending) == chineseArchiveSha) { "Chinese dictionary checksum mismatch from $source" }
+                    pending.copyTo(archive, overwrite = true)
+                    downloaded = true
+                } catch (e: Exception) {
+                    if (e is IllegalStateException) throw e
+                    System.err.println("Chinese dictionary download error from $source: ${e.message}")
+                } finally { connection.disconnect(); pending.delete() }
+            }
+            check(downloaded) { "Failed to download Chinese dictionary archive ($chineseRevision) from all sources" }
         }
         val root = chineseRoot.get().asFile.apply { mkdirs() }
         ZipFile(archive).use { zip ->

@@ -63,16 +63,17 @@ jobs:
           chmod +x gradlew
           ./gradlew downloadOnnx --no-daemon --console=plain
 
-      - name: Build one ARM64 lightweight debug APK
+      # 官方「轻量发布包」预设的口径：Release（代码压缩 + 资源裁剪）+ 不内置模型，单 ARM64。
+      - name: Build one ARM64 lightweight preview APK
         run: |
-          ./gradlew :app:assembleDebug -PcandidatePreview=true -PbundleModels=false --no-daemon --max-workers=2 --console=plain
+          ./gradlew :app:assemblePreview -PcandidatePreview=true -PbundleModels=false --no-daemon --max-workers=2 --console=plain
 
       - name: Verify one APK and preview identity
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import os, subprocess
-          apks = list(Path('app/build/outputs/apk/debug').glob('*.apk'))
+          apks = list(Path('app/build/outputs/apk/preview').glob('*.apk'))
           assert len(apks) == 1, f'Expected one APK, found {apks}'
           apk = apks[0]
           assert 'arm64-v8a' in apk.name, apk.name
@@ -86,6 +87,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: CyIME-comment-test-arm64-lite
-          path: app/build/outputs/apk/debug/*arm64-v8a.apk
+          path: app/build/outputs/apk/preview/*arm64-v8a.apk
           if-no-files-found: error
           retention-days: 7
