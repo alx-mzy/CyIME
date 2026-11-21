@@ -91,6 +91,17 @@ fun downloadWithMirrors(urls: List<String>, target: File, workDir: File, desc: S
 
 fun githubUrls(url: String): List<String> = buildList {
     ghMirrors.forEach { add("${it.trimEnd('/')}/$url") }
+    // jsDelivr 直接按 tag 取 raw 文件；上面几个代理对 raw 路径常返回 404（本地和部分 CI 环境）。
+    val rawPrefix = "https://raw.githubusercontent.com/"
+    if (url.startsWith(rawPrefix)) {
+        val parts = url.removePrefix(rawPrefix).split('/')
+        if (parts.size >= 4) {
+            val repo = "${parts[0]}/${parts[1]}"
+            val tag = parts[2]
+            val path = parts.drop(3).joinToString("/")
+            add("https://cdn.jsdelivr.net/gh/$repo@$tag/$path")
+        }
+    }
     add(url) // 官方源兜底
 }
 
