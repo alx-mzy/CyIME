@@ -14,13 +14,16 @@ object ExpandedCandidatePager {
     /** 拼音注释字号相对候选字号的比例；展开页画字和估算宽度共用，跟着候选字号一起缩放（原 11/18 太小看不清，用户 11-02） */
     const val COMMENT_SIZE_RATIO = 0.75f
 
+    /** 注释上置版本用更细的小字；关闭上置时继续使用旧比例，默认布局不变。 */
+    const val COMMENT_ABOVE_SIZE_RATIO = 11f / 19f
+
     /** 单字符宽度（字符当量）：CJK 约 1 个字宽，其余（拉丁/数字/标点）约 0.55 */
     fun charUnits(c: Char): Float = if (c.code > 0x2E80) 1.0f else 0.55f
 
     /** 条目估算宽度：候选词全字宽 + 注释按小字号折算 + 固定开销 */
-    fun estimateItemUnits(candidate: RimeCandidate, commentBelow: Boolean = false,
+    fun estimateItemUnits(candidate: RimeCandidate, commentAbove: Boolean = false,
         commentCapUnits: Float = Float.POSITIVE_INFINITY): Float {
-        if (!commentBelow) {
+        if (!commentAbove) {
             // Keep the original accumulation order, including float rounding at row boundaries.
             var units = ITEM_FIXED_UNITS
             candidate.text.forEach { units += charUnits(it) }
@@ -30,7 +33,7 @@ object ExpandedCandidatePager {
         var primary = 0f
         var secondary = 0f
         candidate.text.forEach { primary += charUnits(it) }
-        candidate.comment.forEach { secondary += charUnits(it) * COMMENT_SIZE_RATIO }
+        candidate.comment.forEach { secondary += charUnits(it) * COMMENT_ABOVE_SIZE_RATIO }
         return ITEM_FIXED_UNITS + maxOf(primary, minOf(secondary, commentCapUnits))
     }
 
@@ -46,7 +49,7 @@ object ExpandedCandidatePager {
         filtered: List<Int>,
         all: List<RimeCandidate>,
         rowWidthUnits: Float,
-        commentBelow: Boolean = false,
+        commentAbove: Boolean = false,
         commentCapUnits: Float = Float.POSITIVE_INFINITY,
     ): List<List<Int>> {
         if (filtered.isEmpty()) return emptyList()
@@ -54,7 +57,7 @@ object ExpandedCandidatePager {
         var current = mutableListOf<Int>()
         var currentUnits = 0f
         for (index in filtered) {
-            val itemUnits = estimateItemUnits(all[index], commentBelow, commentCapUnits)
+            val itemUnits = estimateItemUnits(all[index], commentAbove, commentCapUnits)
             val withItem = if (current.isEmpty()) itemUnits else currentUnits + itemUnits
             if (current.isNotEmpty() && withItem > rowWidthUnits) {
                 rows.add(current)

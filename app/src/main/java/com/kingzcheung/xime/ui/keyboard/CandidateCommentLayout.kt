@@ -1,10 +1,7 @@
 package com.kingzcheung.xime.ui.keyboard
 
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
@@ -18,68 +15,68 @@ import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
+import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
-internal val BELOW_COMMENT_MAX_WIDTH = 120.dp
-internal const val BELOW_LINE_HEIGHT = 1.35f
-
+/** 注释上置时候选栏整条内容的高度：装得下「注释一行 + 主词一行」，比原来的 44dp 高一点。关闭时仍是 44dp。 */
 @Composable
-internal fun candidateBarContentHeight(fontSize: TextUnit, below: Boolean) =
-    if (below) maxOf(44.dp, candidateItemHeight(fontSize, true) + 4.dp) else 44.dp
+internal fun candidateBarContentHeight(fontSize: TextUnit, commentAbove: Boolean): Dp =
+    if (commentAbove) maxOf(44.dp, candidateItemHeight(fontSize, true) + 4.dp) else 44.dp
 
-/** Allocate fixed baseline slots, including an empty annotation, before async candidates arrive. */
-internal fun Modifier.belowCandidateBaseline(fontSize: TextUnit): Modifier = layout { measurable, constraints ->
+/**
+ * 把一行字做成等高的一槽：槽高 [COMMENT_SLOT_FACTOR]×字号，基线固定在 1.05×字号。
+ * 上下两行各占一槽，字号不同也能对齐，取值和 [candidateBaseline] 一致。
+ */
+internal fun Modifier.candidateSlot(fontSize: TextUnit): Modifier = layout { measurable, constraints ->
     val child = measurable.measure(constraints.copy(minHeight = 0))
     val targetBaseline = (fontSize.toPx() * 1.05f).roundToInt()
     val baseline = child[FirstBaseline].takeUnless { it == AlignmentLine.Unspecified } ?: targetBaseline
     val top = (targetBaseline - baseline).coerceAtLeast(0)
-    val slotHeight = (fontSize.toPx() * BELOW_LINE_HEIGHT).roundToInt()
-    val height = constraints.constrainHeight(maxOf(slotHeight, top + child.height))
-    layout(child.width, height, mapOf(FirstBaseline to top + baseline)) {
-        child.placeRelative(0, top)
-    }
+    val slot = candidateSlotPx(fontSize, this)
+    val height = constraints.constrainHeight(maxOf(slot, top + child.height))
+    layout(child.width, height, mapOf(FirstBaseline to top + baseline)) { child.placeRelative(0, top) }
 }
 
-/** Children: primary, optional zero-width learned marker, secondary. Inline path stays a Row. */
+/**
+ * 注释上置的候选条目：注释（或纠错读音）一行小字在上，主词一行在下，各自居中，宽度取较宽的一行。
+ * 子节点顺序按原本的左右排列给出（主词、角标、注释），这里只改摆放位置。
+ * 关闭时直接把 [content] 发出来，不添任何布局节点，候选和上游完全一样。
+ */
 @Composable
-internal fun CandidateCommentLayout(below: Boolean, fontSize: TextUnit, learned: Boolean = false,
-    secondaryRatio: Float = 11f / 19f,
+internal fun CandidateCommentLayout(commentAbove: Boolean, fontSize: TextUnit, learned: Boolean = false,
     content: @Composable () -> Unit) {
-    if (!below) {
-        Row(verticalAlignment = Alignment.CenterVertically) { content() }
+    if (!commentAbove) {
+        content()
         return
     }
-    val cap = with(LocalDensity.current) { BELOW_COMMENT_MAX_WIDTH.roundToPx() }
-    val height = with(LocalDensity.current) { (fontSize.value * BELOW_LINE_HEIGHT * (1f + secondaryRatio)).sp.toDp() }
+    val cap = with(LocalDensity.current) { COMMENT_MAX_WIDTH.roundToPx() }
     val policy = remember(cap, learned) {
         object : MeasurePolicy {
             override fun MeasureScope.measure(measurables: List<Measurable>, constraints: Constraints): MeasureResult {
                 val primary = measurables.first().measure(constraints.copy(minWidth = 0, minHeight = 0))
-                val secondary = measurables.last().measure(constraints.copy(minWidth = 0, minHeight = 0,
+                val comment = measurables.last().measure(constraints.copy(minWidth = 0, minHeight = 0,
                     maxWidth = minOf(constraints.maxWidth, cap)))
                 val marker = if (learned) measurables[1].measure(constraints.copy(minWidth = 0, minHeight = 0)) else null
-                val width = constraints.constrainWidth(belowCandidateWidth(primary.width, secondary.width, cap))
-                val totalHeight = constraints.constrainHeight(primary.height + secondary.height)
-                return layout(width, totalHeight) {
-                    val top = (totalHeight - primary.height - secondary.height) / 2
-                    primary.placeRelative((width - primary.width) / 2, top)
-                    marker?.placeRelative((width + primary.width) / 2, top)
-                    secondary.placeRelative((width - secondary.width) / 2, top + primary.height)
+                val width = constraints.constrainWidth(commentStackWidth(primary.width, comment.width, cap))
+                val height = constraints.constrainHeight(comment.height + primary.height)
+                return layout(width, height) {
+                    comment.placeRelative((width - comment.width) / 2, 0)
+                    primary.placeRelative((width - primary.width) / 2, comment.height)
+                    marker?.placeRelative((width + primary.width) / 2, comment.height)
                 }
             }
 
             override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurables: List<IntrinsicMeasurable>, height: Int): Int =
-                belowCandidateWidth(measurables.first().maxIntrinsicWidth(height),
+                commentStackWidth(measurables.first().maxIntrinsicWidth(height),
                     measurables.last().maxIntrinsicWidth(height), cap)
 
             override fun IntrinsicMeasureScope.minIntrinsicWidth(measurables: List<IntrinsicMeasurable>, height: Int): Int =
                 maxIntrinsicWidth(measurables, height)
         }
     }
-    Layout(content = content, modifier = Modifier.heightIn(min = height), measurePolicy = policy)
+    Layout(content = content, measurePolicy = policy)
 }

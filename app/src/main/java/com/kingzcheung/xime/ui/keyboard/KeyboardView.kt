@@ -191,7 +191,7 @@ fun KeyboardView(
     // Older hosts can discard the separate window touch region when the lock moves into the footer.
     onFloatingLockPositioned: ((android.graphics.Rect?) -> Unit)? = null,
 ) {
-    val candidateBarBaseHeight = candidateBarContentHeight(rememberCandidateTextSize().sp, rememberCandidateCommentBelow())
+    val candidateBarBaseHeight = candidateBarContentHeight(rememberCandidateTextSize().sp, rememberCandidateCommentAbove())
     if (onFloatingLockPositioned != null) {
         LaunchedEffect(onFloatingLockPositioned) { onFloatingLockPositioned(null) }
     }

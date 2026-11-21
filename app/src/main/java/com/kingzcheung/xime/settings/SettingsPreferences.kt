@@ -541,13 +541,18 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_SHOW_LEARNED_MARK, show).apply()
     }
 
-    const val KEY_CANDIDATE_COMMENT_BELOW = "candidate_comment_below"
+    const val KEY_CANDIDATE_COMMENT_ABOVE = "candidate_comment_above"
+    private const val KEY_LEGACY_CANDIDATE_COMMENT_BELOW = "candidate_comment_below"
 
-    fun candidateCommentBelow(context: Context): Boolean =
-        getPrefs(context).getBoolean(KEY_CANDIDATE_COMMENT_BELOW, false)
+    fun candidateCommentAbove(context: Context): Boolean {
+        val prefs = getPrefs(context)
+        // Preserve the user's opt-in when upgrading from the first below-comment preview.
+        return prefs.getBoolean(KEY_CANDIDATE_COMMENT_ABOVE,
+            prefs.getBoolean(KEY_LEGACY_CANDIDATE_COMMENT_BELOW, false))
+    }
 
-    fun setCandidateCommentBelow(context: Context, below: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_CANDIDATE_COMMENT_BELOW, below).apply()
+    fun setCandidateCommentAbove(context: Context, above: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_CANDIDATE_COMMENT_ABOVE, above).apply()
     }
 
     fun candidateCommentMode(context: Context): CandidateCommentMode {

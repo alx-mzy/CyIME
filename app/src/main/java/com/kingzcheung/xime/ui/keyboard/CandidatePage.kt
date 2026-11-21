@@ -370,19 +370,19 @@ private fun CandidatePageContent(
                 // ── 中间：候选行分组列表（LazyColumn 只渲染可见行），联想词在末尾
                 // 随内容一并滚动 ──
                 BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
+                    val commentAbove = rememberCandidateCommentAbove()
                     val showComments = candidateCommentsVisible(maxWidth.value, LocalDensity.current.fontScale,
-                        candidateTextSize.toFloat(), rememberCandidateCommentsAllowed())
+                        candidateTextSize.toFloat(), rememberCandidateCommentsAllowed(), commentAbove)
                     val rowWidthUnits = with(LocalDensity.current) {
                         ExpandedCandidatePager.rowWidthUnits(maxWidth.toPx(), density * fontScale * candidateTextSize / 18f)
                     }
-                    val commentBelow = rememberCandidateCommentBelow()
                     val commentCapUnits = with(LocalDensity.current) {
-                        BELOW_COMMENT_MAX_WIDTH.toPx() / (candidateTextSize.sp.toPx())
+                        COMMENT_MAX_WIDTH.toPx() / (candidateTextSize.sp.toPx())
                     }
-                    val candidateRows = remember(state.candidates, rowWidthUnits, showComments, commentBelow, commentCapUnits) {
+                    val candidateRows = remember(state.candidates, rowWidthUnits, showComments, commentAbove, commentCapUnits) {
                         // Only layout measurements omit annotations; selection keeps the original entry.
                         val all = state.candidates.map { RimeCandidate(it.text, if (showComments) it.comment else "") }
-                        ExpandedCandidatePager.flowRows(all.indices.toList(), all, rowWidthUnits, commentBelow, commentCapUnits)
+                        ExpandedCandidatePager.flowRows(all.indices.toList(), all, rowWidthUnits, commentAbove, commentCapUnits)
                             .map { row -> row.map { state.candidates[it] } }
                     }
                     LazyColumn(
@@ -547,7 +547,7 @@ private fun CandidatePageItem(
     showComment: Boolean = false,
     textSizeSp: Int = 18,
 ) {
-    val commentBelow = rememberCandidateCommentBelow()
+    val commentAbove = rememberCandidateCommentAbove()
     val displayComment = if (showComment) entry.comment.replace("~", "") else ""
     val annotated = remember(entry.text, displayComment, textColor, textSizeSp) {
         buildAnnotatedString {
@@ -591,22 +591,22 @@ private fun CandidatePageItem(
             .padding(horizontal = 4.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (commentBelow) {
-            CandidateCommentLayout(true, textSizeSp.sp, secondaryRatio = ExpandedCandidatePager.COMMENT_SIZE_RATIO) {
+        if (commentAbove) {
+            CandidateCommentLayout(true, textSizeSp.sp) {
                 BasicText(
                     text = com.kingzcheung.xime.settings.PhraseLineBreaks.shown(entry.text),
-                    modifier = Modifier.belowCandidateBaseline(textSizeSp.sp),
+                    modifier = Modifier.candidateSlot(textSizeSp.sp),
                     style = TextStyle(color = textColor, fontSize = textSizeSp.sp,
-                        lineHeight = (textSizeSp * BELOW_LINE_HEIGHT).sp,
+                        lineHeight = (textSizeSp * COMMENT_SLOT_FACTOR).sp,
                         platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
                         fontFamily = AppFonts.candidateFontFamily).withInputTextLocale(),
                 )
-                val commentSize = (textSizeSp * ExpandedCandidatePager.COMMENT_SIZE_RATIO).sp
+                val commentSize = commentTextUnit(textSizeSp.sp)
                 BasicText(
                     text = displayComment,
-                    modifier = Modifier.belowCandidateBaseline(commentSize),
+                    modifier = Modifier.candidateSlot(commentSize),
                     style = TextStyle(color = textColor.copy(alpha = 0.5f), fontSize = commentSize,
-                        lineHeight = (commentSize.value * BELOW_LINE_HEIGHT).sp,
+                        lineHeight = (commentSize.value * COMMENT_SLOT_FACTOR).sp,
                         platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
                         fontFamily = AppFonts.commentFontFamily).withInputTextLocale(),
                     maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,

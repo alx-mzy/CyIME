@@ -26,15 +26,19 @@ internal fun rememberCandidateTextSize(): Int {
     return size
 }
 
-/** Use the candidate viewport, not the device width: a tablet can host a narrow floating keyboard. */
+/**
+ * Use the candidate viewport, not the device width: a tablet can host a narrow floating keyboard.
+ * 注释上置时「自动」也显示注释：用户明确要上下两行，藏了注释只会剩一条空白行。
+ */
 internal fun candidateCommentsVisible(
     widthDp: Float,
     fontScale: Float,
     textSizeSp: Float,
     mode: CandidateCommentMode,
+    commentAbove: Boolean = false,
 ): Boolean {
     if (widthDp <= 0 || mode == CandidateCommentMode.HIDE) return false
-    if (mode == CandidateCommentMode.SHOW) return true
+    if (mode == CandidateCommentMode.SHOW || commentAbove) return true
     val textScale = (fontScale * textSizeSp / 19f).coerceAtLeast(1f)
     return widthDp >= 480f * textScale
 }
@@ -109,19 +113,26 @@ internal fun rememberDoublePinyinKeysShown(): Boolean {
     return keysShown
 }
 
-/** Placement is independent of AUTO/SHOW/HIDE and annotation content. */
+/**
+ * 注释上置是否生效：开关打开、且注释没有被显式隐藏。
+ * 「自动」在注释上置时照样显示注释（见 [candidateCommentsVisible]），所以这里只看显式的「隐藏」。
+ * 候选栏高度、条目高度、条目宽度、展开页和硬件键盘都用这一个判断，避免某处预留了一行空白。
+ */
 @Composable
-internal fun rememberCandidateCommentBelow(): Boolean {
+internal fun rememberCandidateCommentAbove(): Boolean {
     val context = LocalContext.current
     val preferences = remember(context) { SettingsPreferences.getPrefsPublic(context) }
-    var below by remember(preferences) { mutableStateOf(SettingsPreferences.candidateCommentBelow(context)) }
+    fun current() = SettingsPreferences.candidateCommentAbove(context) &&
+        SettingsPreferences.candidateCommentMode(context) != CandidateCommentMode.HIDE
+    var above by remember(preferences) { mutableStateOf(current()) }
     DisposableEffect(preferences) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == null || key == SettingsPreferences.KEY_CANDIDATE_COMMENT_BELOW)
-                below = SettingsPreferences.candidateCommentBelow(context)
+            if (key == null || key == SettingsPreferences.KEY_CANDIDATE_COMMENT_ABOVE ||
+                key == SettingsPreferences.KEY_CANDIDATE_COMMENT_MODE || key == SettingsPreferences.KEY_SHOW_CANDIDATE_COMMENTS)
+                above = current()
         }
         preferences.registerOnSharedPreferenceChangeListener(listener)
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    return below
+    return above
 }

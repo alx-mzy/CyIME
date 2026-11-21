@@ -521,12 +521,12 @@ private fun LayoutDisplayPage(
                         }
                     }
 
-                    var commentBelow by remember { mutableStateOf(SettingsPreferences.candidateCommentBelow(context)) }
-                    Column(Modifier.settingsSearchAnchor("注释下置")) {
-                        SettingsToggleItem(Icons.TwoTone.FormatColorFill, "注释下置",
-                            "开启为上下排列，关闭为左右排列；长注释省略显示", commentBelow, {
-                                commentBelow = it
-                                SettingsPreferences.setCandidateCommentBelow(context, it)
+                    var commentAbove by remember { mutableStateOf(SettingsPreferences.candidateCommentAbove(context)) }
+                    Column(Modifier.settingsSearchAnchor("注释上置")) {
+                        SettingsToggleItem(Icons.TwoTone.FormatColorFill, "注释上置",
+                            "注释（拼音、释义）一行小字显示在候选上方，候选栏会变高；关闭保持原来的左右排列", commentAbove, {
+                                commentAbove = it
+                                SettingsPreferences.setCandidateCommentAbove(context, it)
                             })
                     }
 

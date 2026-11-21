@@ -22,6 +22,15 @@ class CandidateCommentVisibilityTest {
         assertFalse(candidateCommentsVisible(360f, .8f, 14f, CandidateCommentMode.AUTO))
     }
 
+    @Test fun abovePlacementShowsAutoCommentsEvenOnNarrowFloatingPanels() {
+        for (width in listOf(220f, 320f, 420f)) {
+            assertFalse(candidateCommentsVisible(width, 1f, 19f, CandidateCommentMode.AUTO))
+            assertTrue(candidateCommentsVisible(width, 1f, 19f, CandidateCommentMode.AUTO, commentAbove = true))
+        }
+        // 显式隐藏仍然生效，避免只剩一行空白。
+        assertFalse(candidateCommentsVisible(960f, 1f, 19f, CandidateCommentMode.HIDE, commentAbove = true))
+    }
+
     @Test fun explicitShowWinsOnPhoneFloatingAndLargeFontWidths() {
         for (width in listOf(220f, 320f, 480f, 720f)) {
             assertTrue(candidateCommentsVisible(width, 2f, 28f, CandidateCommentMode.SHOW))

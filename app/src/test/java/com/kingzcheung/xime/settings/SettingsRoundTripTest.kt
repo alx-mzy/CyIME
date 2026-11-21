@@ -40,6 +40,7 @@ class SettingsRoundTripTest {
         Case("候选注释", CandidateCommentMode.HIDE, CandidateCommentMode.SHOW, S::setCandidateCommentMode, S::candidateCommentMode),
         Case("候选注释内容", CandidateCommentContent.GLOSS, CandidateCommentContent.PINYIN,
             S::setCandidateCommentContent, S::candidateCommentContent),
+        Case("候选注释上置", false, true, S::setCandidateCommentAbove, S::candidateCommentAbove),
         Case("候选栏取消按钮", true, false, S::setShowCandidateCancelButton, S::shouldShowCandidateCancelButton),
         Case("联想关闭键用叉号", true, false, S::setAssociationCancelCross, S::isAssociationCancelCross),
         Case("编码显示位置", SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR, SettingsPreferences.INPUT_TEXT_INPUT_BOX,
@@ -67,6 +68,14 @@ class SettingsRoundTripTest {
         Case("短信验证码", true, false, S::setSmsCodeEnabled, S::isSmsCodeEnabled),
         Case("备份包含个人数据", true, false, BackupChoices::setIncludePersonal, BackupChoices::includePersonal),
     )
+
+    @Test fun oldBelowCommentSwitchMigratesToTheNewAbovePreference() {
+        values["candidate_comment_below"] = true
+        assertEquals(true, S.candidateCommentAbove(context))
+        // New value wins if both keys exist; old installs don't overwrite an explicitly changed preference.
+        values["candidate_comment_above"] = false
+        assertEquals(false, S.candidateCommentAbove(context))
+    }
 
     @Test fun everySettingReadsBackWhatWasWritten() {
         val broken = cases.flatMap { case ->

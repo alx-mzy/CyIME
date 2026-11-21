@@ -335,7 +335,7 @@ fun CandidateBar(
         if (it == CandidateCommentMode.AUTO && page is KeyboardPage.Main && page.type == MainType.HANDWRITING) CandidateCommentMode.SHOW else it
     }
     // 终端里编码一律显示在候选栏（见 TerminalEditor）。
-    val commentBelow = rememberCandidateCommentBelow()
+    val commentAbove = rememberCandidateCommentAbove()
     val candidateTextSize = rememberCandidateTextSize()
     val candidateItemPadding = rememberCandidateItemPadding(candidateTextSize.sp)
     val candidateFontFamily = AppFonts.candidateFontFamily
@@ -460,9 +460,9 @@ fun CandidateBar(
 
     // 拼音放在候选上方一行小字（默认，11-19 参照微信）：栏高 44dp 不变，上面让出一条细行，候选行压到剩下的高度。
     // 候选字太大放不下这一行时（大字号或系统字体放大），退回候选栏左侧显示，拼音照样在键盘里。
-    val barHeight = candidateBarContentHeight(candidateTextSize.sp, commentBelow)
-    // 注释下置时栏会变高：顶行从实际栏高里让出，候选行仍装得下（含注释）的条目高度。
-    val topLineHeight = (barHeight - maxOf(candidateItemHeight(candidateTextSize.sp, commentBelow), TOP_LINE_MIN_ROW)).coerceAtMost(TOP_LINE_MAX)
+    val barHeight = candidateBarContentHeight(candidateTextSize.sp, commentAbove)
+    // 注释上置时栏会变高：顶行从实际栏高里让出，候选行仍装得下（含注释）的条目高度。
+    val topLineHeight = (barHeight - maxOf(candidateItemHeight(candidateTextSize.sp, commentAbove), TOP_LINE_MIN_ROW)).coerceAtMost(TOP_LINE_MAX)
     val topLineFits = topLineHeight >= TOP_LINE_MIN
     val topLineMode = showPreeditPreview && previewPrefs.preeditOnTopLine && topLineFits && showInputTextRow && inlinePreeditEditor == null &&
         (state is CandidateBarState.ChineseCandidates || state is CandidateBarState.AssociationOnly)
@@ -688,7 +688,7 @@ fun CandidateBar(
                 )
             } else if (state !is CandidateBarState.Idle) BoxWithConstraints(Modifier.weight(1f)) {
                 val showComments = candidateCommentsVisible(maxWidth.value, density.fontScale,
-                    candidateTextSize.toFloat(), commentsAllowed)
+                    candidateTextSize.toFloat(), commentsAllowed, commentAbove)
                 val showDividers = candidateDividersShown(4.dp, candidateItemPadding)
                 val itemDividerColor = candidateDividerColor(protectedVisuals.textColor)
                 LazyRow(
@@ -1221,7 +1221,7 @@ fun CandidateItem(
     horizontalPadding: androidx.compose.ui.unit.Dp = CANDIDATE_ITEM_PADDING,
     /** 比整条还宽的长候选缩小后的字号／两行，见 [CandidateFit]；平常为空。 */
     fit: CandidateFit? = null,
-    commentBelow: Boolean = rememberCandidateCommentBelow(),
+    commentAbove: Boolean = rememberCandidateCommentAbove(),
 ) {
     // 登记位置给 Shift 拖动：从 Shift 拖到这里松手，按住 Shift 选它（释义模式上屏英文）。
     val dropId = remember { Any() }
@@ -1241,7 +1241,7 @@ fun CandidateItem(
             .then(if (interactive) Modifier.onGloballyPositioned {
                 CandidateDropTargets.shared.put(dropId, dragSpace.bounds(it)) { currentClick() } } else Modifier)
             .height(if (fit?.twoLines == true) maxOf(candidateItemHeight(fontSize), LocalCandidateRowHeight.current - 4.dp)
-                else candidateItemHeight(fontSize, commentBelow))
+                else candidateItemHeight(fontSize, commentAbove))
             .clip(RoundedCornerShape(5.dp))
             .background(
                 if (isSelected && selectionFill) accentColor.copy(alpha = 0.2f)
@@ -1255,7 +1255,7 @@ fun CandidateItem(
             .padding(horizontal = horizontalPadding, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CandidateCommentLayout(commentBelow, fontSize, learned) {
+        CandidateCommentLayout(commentAbove, fontSize, learned) {
         val textSize = fit?.fontSize ?: fontSize
         val twoLineWidth = fit?.takeIf { it.twoLines }?.textWidth
         val primaryStyle = candidatePrimaryTextStyle(textSize, candidateFontFamily, isSelected).let {
@@ -1264,7 +1264,7 @@ fun CandidateItem(
         Text(
             text = sentenceCandidateText(text, index, dragSelection, LocalSentenceCandidateHighlight.current, accentColor),
             modifier = (if (twoLineWidth != null) Modifier.width(with(LocalDensity.current) { twoLineWidth.toDp() })
-                else if (commentBelow) Modifier.belowCandidateBaseline(fontSize) else Modifier.candidateBaseline(textSize)).then(if (interactive && onSentenceSelection != null && text.isNotEmpty()) Modifier
+                else if (commentAbove) Modifier.candidateSlot(fontSize) else Modifier.candidateBaseline(textSize)).then(if (interactive && onSentenceSelection != null && text.isNotEmpty()) Modifier
                 .magnifier(sourceCenter = { magnifierPosition })
                 .pointerInput(text) {
                 awaitEachGesture {
@@ -1330,22 +1330,22 @@ fun CandidateItem(
                     .testTag("candidate-learned:$index"),
             )
         }
-        if (commentBelow || correction.isNotEmpty() || comment.isNotEmpty()) {
+        if (commentAbove || correction.isNotEmpty() || comment.isNotEmpty()) {
             // 后面跟着注释时让出角标那一点，免得压到注释。
-            if (!commentBelow) Spacer(modifier = Modifier.width(if (learned) learnedCommentGap(fontSize) else 3.dp))
+            if (!commentAbove) Spacer(modifier = Modifier.width(if (learned) learnedCommentGap(fontSize) else 3.dp))
             val commentColor = if (isSelected) selectedTextColor.copy(alpha = if (opaqueComment) 1f else 0.6f) else textColor.copy(alpha = if (opaqueComment) 1f else 0.5f)
             Text(
                 text = if (correction.isNotEmpty()) correctionAnnotatedString(correction, commentColor, LocalCorrectionFullScheme.current)
                     else androidx.compose.ui.text.AnnotatedString(comment),
-                modifier = if (commentBelow) Modifier.belowCandidateBaseline((fontSize.value * 11f / 19f).sp)
+                modifier = if (commentAbove) Modifier.candidateSlot(commentTextUnit(fontSize))
                     else Modifier.candidateBaseline(fontSize),
                 color = commentColor,
-                fontSize = (fontSize.value * 11f / 19f).sp,
+                fontSize = commentTextUnit(fontSize),
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 fontFamily = commentFontFamily,
-                style = if (commentBelow) LocalTextStyle.current.copy(
-                    shadow = textShadow, lineHeight = (fontSize.value * 11f / 19f * BELOW_LINE_HEIGHT).sp,
+                style = if (commentAbove) LocalTextStyle.current.copy(
+                    shadow = textShadow, lineHeight = (commentTextUnit(fontSize).value * COMMENT_SLOT_FACTOR).sp,
                     platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
                 ) else LocalTextStyle.current.copy(shadow = textShadow),
                 overflow = TextOverflow.Ellipsis,
@@ -1419,8 +1419,15 @@ internal fun rememberCandidateItemPadding(fontSize: androidx.compose.ui.unit.Tex
 
 /** Reserve the same text height before asynchronous candidates arrive. */
 @Composable
-internal fun candidateItemHeight(fontSize: androidx.compose.ui.unit.TextUnit, below: Boolean = false): androidx.compose.ui.unit.Dp =
-    with(LocalDensity.current) { (fontSize.value * if (below) BELOW_LINE_HEIGHT * (1f + 11f / 19f) else 1.35f).sp.toDp() } + 4.dp
+internal fun candidateItemHeight(fontSize: androidx.compose.ui.unit.TextUnit, commentAbove: Boolean = false): androidx.compose.ui.unit.Dp {
+    val density = LocalDensity.current
+    // 关闭时就是原来那一行字的高度，数值与上游完全一致。
+    if (!commentAbove) return with(density) { (fontSize.value * 1.35f).sp.toDp() } + 4.dp
+    // 注释上置多出注释那一行：按取整后的两槽相加，正好等于布局量出来的高度，不裁字。
+    val primary = candidateSlotPx(fontSize, density)
+    val comment = candidateSlotPx(commentTextUnit(fontSize), density)
+    return with(density) { (primary + comment).toDp() } + 4.dp
+}
 
 /** 候选词和联想词共用：向下展开，向上返回键盘。 */
 @Composable
@@ -1829,7 +1836,7 @@ internal fun FixedCandidateStrip(
     }
     val inheritedTextStyle = LocalTextStyle.current
     val commentsAllowed = rememberCandidateCommentsAllowed().let { commentMode ?: it }
-    val commentBelow = rememberCandidateCommentBelow()
+    val commentAbove = rememberCandidateCommentAbove()
     // 选中底色由整条统一画，换选中的候选时从旧候选滑到新候选（用户 10-21 选 1）；
     // 候选一变（打字、翻页）就直接落到新位置，打字时什么都不动。
     var stripRootOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
@@ -1873,7 +1880,7 @@ internal fun FixedCandidateStrip(
             val right = (r - stripOriginX).coerceIn(left, constraints.maxWidth.toFloat())
             if (right - left >= 1f && left > 0f) left.toInt() to right.toInt() else null
         }
-        val commentsShown = candidateCommentsVisible(maxWidth.value, density.fontScale, fontSize.value, commentsAllowed)
+        val commentsShown = candidateCommentsVisible(maxWidth.value, density.fontScale, fontSize.value, commentsAllowed, commentAbove)
         val shownComments = if (commentsShown) comments else emptyList()
         val all = candidates + associations
         val focused = highlightIndex.takeIf { it in candidates.indices } ?: 0
@@ -1883,7 +1890,7 @@ internal fun FixedCandidateStrip(
         val correctedCandidates = shownCorrections(LocalCorrectedCandidates.current, commentsShown)
         val fullCorrectionScheme = LocalCorrectionFullScheme.current
         val twoLineHeight = LocalCandidateRowHeight.current - 4.dp
-        val window = remember(commentBelow, twoLineHeight, viewport, all, candidates.size, shownComments, commentsAreGlosses, scrollable, focused, fontSize, density, measurer, textWidths, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap, learnedCandidates, correctedCandidates, fullCorrectionScheme) {
+        val window = remember(commentAbove, twoLineHeight, viewport, all, candidates.size, shownComments, commentsAreGlosses, scrollable, focused, fontSize, density, measurer, textWidths, inheritedTextStyle, showNumberLabels, itemSpacing, itemPadding, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap, learnedCandidates, correctedCandidates, fullCorrectionScheme) {
             val bodyWidths = HashMap<Int, Int>()
             fun bodyWidth(index: Int): Int = bodyWidths.getOrPut(index) {
                 val numbered = index < candidates.size
@@ -1896,27 +1903,27 @@ internal fun FixedCandidateStrip(
             fun widthAt(index: Int): Int = fullWidths.getOrPut(index) {
                 val secondaryText = candidateSecondaryText(shownComments.getOrElse(index) { "" },
                     if (index < candidates.size) correctedCandidates[all[index]].orEmpty() else "", fullCorrectionScheme)
-                val secondary = if (secondaryText.isEmpty()) 0 else textWidths.of(secondaryText,
-                    inheritedTextStyle.merge(TextStyle(fontSize = (fontSize.value * 11f / 19f).sp,
-                        fontWeight = FontWeight.Normal, fontFamily = AppFonts.commentFontFamily))) + with(density) {
-                        (if (index < candidates.size && all[index] in learnedCandidates) learnedCommentGap(fontSize) else 3.dp).roundToPx() }
-                if (commentBelow) {
+                val comment = if (secondaryText.isEmpty()) 0 else textWidths.of(secondaryText,
+                    inheritedTextStyle.merge(TextStyle(fontSize = commentTextUnit(fontSize),
+                        fontWeight = FontWeight.Normal, fontFamily = AppFonts.commentFontFamily)))
+                val gap = with(density) {
+                    (if (index < candidates.size && all[index] in learnedCandidates) learnedCommentGap(fontSize) else 3.dp).roundToPx() }
+                if (commentAbove) {
+                    // 上下排列：条目宽取主词与（限宽）注释的较宽者，注释再长也不挤主词、不占主词右边。
                     val padding = with(density) { 2 * itemPadding.roundToPx() }
-                    val gap = with(density) { (if (index < candidates.size && all[index] in learnedCandidates)
-                        learnedCommentGap(fontSize) else 3.dp).roundToPx() }
-                    belowCandidateWidth(bodyWidth(index) - padding, (secondary - gap).coerceAtLeast(0),
-                        with(density) { BELOW_COMMENT_MAX_WIDTH.roundToPx() }) + padding
-                } else bodyWidth(index) + secondary
+                    commentStackWidth(bodyWidth(index) - padding, comment,
+                        with(density) { COMMENT_MAX_WIDTH.roundToPx() }) + padding
+                } else if (comment == 0) bodyWidth(index) else bodyWidth(index) + comment + gap
             }
             // 纠错标记和拼音仍要完整。只有释义可以越过本段右边界。
-            val glossBodyWidthAt: ((Int) -> Int?)? = if (!commentBelow && commentsAreGlosses && shownComments.isNotEmpty()) { index ->
+            val glossBodyWidthAt: ((Int) -> Int?)? = if (!commentAbove && commentsAreGlosses && shownComments.isNotEmpty()) { index ->
                 if (index !in candidates.indices || shownComments.getOrNull(index).isNullOrEmpty() || !correctedCandidates[all[index]].isNullOrEmpty()) null
                 else bodyWidth(index)
             } else null
             fun measureFit(index: Int): CandidateFit? {
                 val full = widthAt(index)
                 // A long annotation must never trigger primary shrinking or a two-line primary.
-                if (commentBelow || full <= constraints.maxWidth) return null
+                if (commentAbove || full <= constraints.maxWidth) return null
                 val text = AnnotatedString(candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size))
                 val primary = textWidths.of(text, candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily,
                     index == focused))

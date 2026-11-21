@@ -159,19 +159,18 @@ fun HardwareKeyboardCandidateBar(
             avoidBounds = toolbarExclusion,
         )
         val shownCount = candidates.size.coerceAtMost(MAX_VISIBLE_CANDIDATES)
-        val commentStyle = TextStyle(fontSize = (fontSize.value * 11f / 19f).sp, fontFamily = AppFonts.commentFontFamily)
-        val commentBelow = rememberCandidateCommentBelow()
-        val commentCapPx = with(density) { BELOW_COMMENT_MAX_WIDTH.roundToPx() }
+        val commentStyle = TextStyle(fontSize = commentTextUnit(fontSize), fontFamily = AppFonts.commentFontFamily)
+        val commentAbove = rememberCandidateCommentAbove()
+        val commentCapPx = with(density) { COMMENT_MAX_WIDTH.roundToPx() }
         val textWidth = candidates.take(MAX_VISIBLE_CANDIDATES).mapIndexed { index, text ->
             val primary = measurer.measure(AnnotatedString(candidateNumberedText(text, index, showNumberLabels)),
                 candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == highlightIndex), softWrap = false).size.width
-            val comment = if (commentBelow && SettingsPreferences.candidateCommentMode(context) ==
-                com.kingzcheung.xime.settings.CandidateCommentMode.HIDE) "" else comments.getOrNull(index).orEmpty()
+            val comment = comments.getOrNull(index).orEmpty()
             if (comment.isEmpty()) primary
-            else if (commentBelow) {
-                // 注释下置时条目宽是主词与（限宽）注释的较大者，不叠加；与 FixedCandidateStrip 的 widthAt 同一套几何。
+            else if (commentAbove) {
+                // 注释上置时条目宽是主词与（限宽）注释的较大者，不叠加；与 FixedCandidateStrip 的 widthAt 同一套几何。
                 val secondary = measurer.measure(AnnotatedString(comment), commentStyle, softWrap = false).size.width
-                maxOf(primary, minOf(secondary, commentCapPx))
+                commentStackWidth(primary, secondary, commentCapPx)
             } else primary + measurer.measure(AnnotatedString(comment), commentStyle, softWrap = false).size.width +
                 with(density) { 3.dp.roundToPx() }
         }.sum()
@@ -288,7 +287,7 @@ private fun androidx.compose.ui.geometry.Rect.toAndroidBounds() = Rect(
 /** The exact same single-row renderer is used beside the caret and inside the dock. */
 @Composable
 internal fun hardwareCandidateRowHeight(): androidx.compose.ui.unit.Dp {
-    val below = rememberCandidateCommentBelow()
+    val below = rememberCandidateCommentAbove()
     return (candidateItemHeight(rememberCandidateTextSize().sp, below) + 8.dp)
         .coerceAtLeast(48.dp)
 }
