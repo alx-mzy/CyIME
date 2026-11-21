@@ -57,9 +57,13 @@ jobs:
           restore-keys: |
             candidate-arm64-${{ runner.os }}-
 
-      - name: Build one ARM64 lightweight debug APK
+      - name: Download ONNX Runtime native deps
         run: |
           chmod +x gradlew
+          ./gradlew downloadOnnx --no-daemon --console=plain
+
+      - name: Build one ARM64 lightweight debug APK
+        run: |
           ./gradlew :app:assembleDebug -PcandidatePreview=true -PbundleModels=false --no-daemon --max-workers=2 --console=plain
 
       - name: Verify one APK and preview identity
