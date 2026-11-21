@@ -108,3 +108,20 @@ internal fun rememberDoublePinyinKeysShown(): Boolean {
     }
     return keysShown
 }
+
+/** Placement is independent of AUTO/SHOW/HIDE and annotation content. */
+@Composable
+internal fun rememberCandidateCommentBelow(): Boolean {
+    val context = LocalContext.current
+    val preferences = remember(context) { SettingsPreferences.getPrefsPublic(context) }
+    var below by remember(preferences) { mutableStateOf(SettingsPreferences.candidateCommentBelow(context)) }
+    DisposableEffect(preferences) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key == SettingsPreferences.KEY_CANDIDATE_COMMENT_BELOW)
+                below = SettingsPreferences.candidateCommentBelow(context)
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return below
+}

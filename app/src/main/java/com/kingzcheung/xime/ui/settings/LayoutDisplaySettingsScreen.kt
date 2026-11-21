@@ -521,6 +521,15 @@ private fun LayoutDisplayPage(
                         }
                     }
 
+                    var commentBelow by remember { mutableStateOf(SettingsPreferences.candidateCommentBelow(context)) }
+                    Column(Modifier.settingsSearchAnchor("注释下置")) {
+                        SettingsToggleItem(Icons.TwoTone.FormatColorFill, "注释下置",
+                            "开启为上下排列，关闭为左右排列；长注释省略显示", commentBelow, {
+                                commentBelow = it
+                                SettingsPreferences.setCandidateCommentBelow(context, it)
+                            })
+                    }
+
                     // 注释隐藏时内容选项无意义：整段不显示，也不会触发释义词典下载。
                     if (commentMode != com.kingzcheung.xime.settings.CandidateCommentMode.HIDE) {
                         val prefs = SettingsPreferences.getPrefsPublic(context)

@@ -375,10 +375,14 @@ private fun CandidatePageContent(
                     val rowWidthUnits = with(LocalDensity.current) {
                         ExpandedCandidatePager.rowWidthUnits(maxWidth.toPx(), density * fontScale * candidateTextSize / 18f)
                     }
-                    val candidateRows = remember(state.candidates, rowWidthUnits, showComments) {
+                    val commentBelow = rememberCandidateCommentBelow()
+                    val commentCapUnits = with(LocalDensity.current) {
+                        BELOW_COMMENT_MAX_WIDTH.toPx() / (candidateTextSize.sp.toPx())
+                    }
+                    val candidateRows = remember(state.candidates, rowWidthUnits, showComments, commentBelow, commentCapUnits) {
                         // Only layout measurements omit annotations; selection keeps the original entry.
                         val all = state.candidates.map { RimeCandidate(it.text, if (showComments) it.comment else "") }
-                        ExpandedCandidatePager.flowRows(all.indices.toList(), all, rowWidthUnits)
+                        ExpandedCandidatePager.flowRows(all.indices.toList(), all, rowWidthUnits, commentBelow, commentCapUnits)
                             .map { row -> row.map { state.candidates[it] } }
                     }
                     LazyColumn(
@@ -543,6 +547,7 @@ private fun CandidatePageItem(
     showComment: Boolean = false,
     textSizeSp: Int = 18,
 ) {
+    val commentBelow = rememberCandidateCommentBelow()
     val displayComment = if (showComment) entry.comment.replace("~", "") else ""
     val annotated = remember(entry.text, displayComment, textColor, textSizeSp) {
         buildAnnotatedString {
@@ -586,11 +591,34 @@ private fun CandidatePageItem(
             .padding(horizontal = 4.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        BasicText(
-            text = annotated,
-            style = TextStyle(fontWeight = FontWeight.Normal, lineHeight = 25.sp,
-                platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)).withInputTextLocale(),
-        )
+        if (commentBelow) {
+            CandidateCommentLayout(true, textSizeSp.sp, secondaryRatio = ExpandedCandidatePager.COMMENT_SIZE_RATIO) {
+                BasicText(
+                    text = com.kingzcheung.xime.settings.PhraseLineBreaks.shown(entry.text),
+                    modifier = Modifier.belowCandidateBaseline(textSizeSp.sp),
+                    style = TextStyle(color = textColor, fontSize = textSizeSp.sp,
+                        lineHeight = (textSizeSp * BELOW_LINE_HEIGHT).sp,
+                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
+                        fontFamily = AppFonts.candidateFontFamily).withInputTextLocale(),
+                )
+                val commentSize = (textSizeSp * ExpandedCandidatePager.COMMENT_SIZE_RATIO).sp
+                BasicText(
+                    text = displayComment,
+                    modifier = Modifier.belowCandidateBaseline(commentSize),
+                    style = TextStyle(color = textColor.copy(alpha = 0.5f), fontSize = commentSize,
+                        lineHeight = (commentSize.value * BELOW_LINE_HEIGHT).sp,
+                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
+                        fontFamily = AppFonts.commentFontFamily).withInputTextLocale(),
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+            }
+        } else {
+            BasicText(
+                text = annotated,
+                style = TextStyle(fontWeight = FontWeight.Normal, lineHeight = 25.sp,
+                    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)).withInputTextLocale(),
+            )
+        }
     }
 }
 

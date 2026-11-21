@@ -160,12 +160,20 @@ fun HardwareKeyboardCandidateBar(
         )
         val shownCount = candidates.size.coerceAtMost(MAX_VISIBLE_CANDIDATES)
         val commentStyle = TextStyle(fontSize = (fontSize.value * 11f / 19f).sp, fontFamily = AppFonts.commentFontFamily)
+        val commentBelow = rememberCandidateCommentBelow()
+        val commentCapPx = with(density) { BELOW_COMMENT_MAX_WIDTH.roundToPx() }
         val textWidth = candidates.take(MAX_VISIBLE_CANDIDATES).mapIndexed { index, text ->
-            val comment = comments.getOrNull(index).orEmpty()
-            measurer.measure(AnnotatedString(candidateNumberedText(text, index, true)),
-                candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == highlightIndex), softWrap = false).size.width +
-                if (comment.isEmpty()) 0 else measurer.measure(AnnotatedString(comment), commentStyle, softWrap = false).size.width +
-                    with(density) { 3.dp.roundToPx() }
+            val primary = measurer.measure(AnnotatedString(candidateNumberedText(text, index, showNumberLabels)),
+                candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == highlightIndex), softWrap = false).size.width
+            val comment = if (commentBelow && SettingsPreferences.candidateCommentMode(context) ==
+                com.kingzcheung.xime.settings.CandidateCommentMode.HIDE) "" else comments.getOrNull(index).orEmpty()
+            if (comment.isEmpty()) primary
+            else if (commentBelow) {
+                // 注释下置时条目宽是主词与（限宽）注释的较大者，不叠加；与 FixedCandidateStrip 的 widthAt 同一套几何。
+                val secondary = measurer.measure(AnnotatedString(comment), commentStyle, softWrap = false).size.width
+                maxOf(primary, minOf(secondary, commentCapPx))
+            } else primary + measurer.measure(AnnotatedString(comment), commentStyle, softWrap = false).size.width +
+                with(density) { 3.dp.roundToPx() }
         }.sum()
         // 卡片按候选自身的宽度定，要把行里真正画出来的都算上：每个候选左右留白 4dp×2 加间距 8dp、注释，
         // 以及展开、上一个、下一个三个 40dp 按钮里这一页实际出现的那几个。以前固定只留两个按钮的 104dp：
@@ -279,9 +287,11 @@ private fun androidx.compose.ui.geometry.Rect.toAndroidBounds() = Rect(
 
 /** The exact same single-row renderer is used beside the caret and inside the dock. */
 @Composable
-internal fun hardwareCandidateRowHeight(): androidx.compose.ui.unit.Dp =
-    (candidateItemHeight(SettingsPreferences.getCandidateTextSize(LocalContext.current).sp) + 8.dp)
+internal fun hardwareCandidateRowHeight(): androidx.compose.ui.unit.Dp {
+    val below = rememberCandidateCommentBelow()
+    return (candidateItemHeight(rememberCandidateTextSize().sp, below) + 8.dp)
         .coerceAtLeast(48.dp)
+}
 
 @Composable
 internal fun HardwareCandidateRow(

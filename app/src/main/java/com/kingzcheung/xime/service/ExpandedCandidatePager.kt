@@ -18,11 +18,20 @@ object ExpandedCandidatePager {
     fun charUnits(c: Char): Float = if (c.code > 0x2E80) 1.0f else 0.55f
 
     /** 条目估算宽度：候选词全字宽 + 注释按小字号折算 + 固定开销 */
-    fun estimateItemUnits(candidate: RimeCandidate): Float {
-        var units = ITEM_FIXED_UNITS
-        candidate.text.forEach { units += charUnits(it) }
-        candidate.comment.forEach { units += charUnits(it) * COMMENT_SIZE_RATIO }
-        return units
+    fun estimateItemUnits(candidate: RimeCandidate, commentBelow: Boolean = false,
+        commentCapUnits: Float = Float.POSITIVE_INFINITY): Float {
+        if (!commentBelow) {
+            // Keep the original accumulation order, including float rounding at row boundaries.
+            var units = ITEM_FIXED_UNITS
+            candidate.text.forEach { units += charUnits(it) }
+            candidate.comment.forEach { units += charUnits(it) * COMMENT_SIZE_RATIO }
+            return units
+        }
+        var primary = 0f
+        var secondary = 0f
+        candidate.text.forEach { primary += charUnits(it) }
+        candidate.comment.forEach { secondary += charUnits(it) * COMMENT_SIZE_RATIO }
+        return ITEM_FIXED_UNITS + maxOf(primary, minOf(secondary, commentCapUnits))
     }
 
     /** 中间候选区的实际宽度（已扣除侧栏和间距），以 18sp 字宽为一单位。 */
@@ -37,13 +46,15 @@ object ExpandedCandidatePager {
         filtered: List<Int>,
         all: List<RimeCandidate>,
         rowWidthUnits: Float,
+        commentBelow: Boolean = false,
+        commentCapUnits: Float = Float.POSITIVE_INFINITY,
     ): List<List<Int>> {
         if (filtered.isEmpty()) return emptyList()
         val rows = mutableListOf<List<Int>>()
         var current = mutableListOf<Int>()
         var currentUnits = 0f
         for (index in filtered) {
-            val itemUnits = estimateItemUnits(all[index])
+            val itemUnits = estimateItemUnits(all[index], commentBelow, commentCapUnits)
             val withItem = if (current.isEmpty()) itemUnits else currentUnits + itemUnits
             if (current.isNotEmpty() && withItem > rowWidthUnits) {
                 rows.add(current)

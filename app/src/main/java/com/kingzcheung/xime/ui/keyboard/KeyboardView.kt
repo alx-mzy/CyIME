@@ -191,6 +191,7 @@ fun KeyboardView(
     // Older hosts can discard the separate window touch region when the lock moves into the footer.
     onFloatingLockPositioned: ((android.graphics.Rect?) -> Unit)? = null,
 ) {
+    val candidateBarBaseHeight = candidateBarContentHeight(rememberCandidateTextSize().sp, rememberCandidateCommentBelow())
     if (onFloatingLockPositioned != null) {
         LaunchedEffect(onFloatingLockPositioned) { onFloatingLockPositioned(null) }
     }
@@ -2312,7 +2313,7 @@ fun KeyboardView(
                     val toolbarSlot = handwritingOverlaySlot
                     Box((if (toolbarSlot == null) Modifier.align(Alignment.TopCenter).fillMaxWidth()
                         else Modifier.align(Alignment.BottomCenter)
-                            .padding(bottom = (toolbarSlot.heightDp - candidateBarHeightDp(candidateBarScaleState.floatValue)).coerceAtLeast(0f).dp)
+                            .padding(bottom = (toolbarSlot.heightDp - (candidateBarBaseHeight.value * candidateBarScaleState.floatValue)).coerceAtLeast(0f).dp)
                             .absoluteOffset(x = toolbarSlot.offsetXDp.dp).width(toolbarSlot.widthDp.dp))
                         .keyboardPanelBackground(keyboardBgColor)
                         .then(if (!overlayVisibility.targetState) Modifier.clearAndSetSemantics {} else Modifier)) {
@@ -2446,9 +2447,9 @@ fun KeyboardView(
                 visible = page is KeyboardPage.Overlay,
                 modifier = (handwritingOverlaySlot?.let { slot ->
                     Modifier.align(Alignment.BottomCenter).absoluteOffset(x = slot.offsetXDp.dp).width(slot.widthDp.dp)
-                        .height((slot.heightDp - candidateBarHeightDp(candidateBarScaleState.floatValue)).coerceAtLeast(0f).dp)
+                        .height((slot.heightDp - (candidateBarBaseHeight.value * candidateBarScaleState.floatValue)).coerceAtLeast(0f).dp)
                 } ?: Modifier.fillMaxSize().belowCandidateBar(aboveCandidateBarPx,
-                    candidateBarHeightDp(candidateBarScaleState.floatValue).dp))
+                    (candidateBarBaseHeight.value * candidateBarScaleState.floatValue).dp))
                     .testTag("keyboard-overlay"),
                 visibility = overlayVisibility,
                 revealState = overlayReveal,
@@ -2720,7 +2721,8 @@ fun KeyboardView(
             density = resizeControlDensity,
             aspectLimits = KeyboardAspectLimits.forLayout(state.inputProfile.layout.kind, splitActive, splitGapFraction),
             squareSnap = KeyboardSquareSnap.forLayout(state.inputProfile.layout.kind, splitActive, splitGapFraction,
-                inputPreferences.wideKeys, numberRow = inputPreferences.numberRow),
+                inputPreferences.wideKeys, numberRow = inputPreferences.numberRow)
+                ?.copy(candidateBarBaseHeightDp = candidateBarBaseHeight.value),
             splitGapFraction = splitGapSetting,
             splitPitchDp = splitPitchDp,
             onSplitGapChange = { splitGapPreview.value = it },

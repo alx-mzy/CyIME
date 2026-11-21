@@ -541,6 +541,15 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_SHOW_LEARNED_MARK, show).apply()
     }
 
+    const val KEY_CANDIDATE_COMMENT_BELOW = "candidate_comment_below"
+
+    fun candidateCommentBelow(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_CANDIDATE_COMMENT_BELOW, false)
+
+    fun setCandidateCommentBelow(context: Context, below: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_CANDIDATE_COMMENT_BELOW, below).apply()
+    }
+
     fun candidateCommentMode(context: Context): CandidateCommentMode {
         val prefs = getPrefs(context)
         val stored = prefs.getString(KEY_CANDIDATE_COMMENT_MODE, null)
