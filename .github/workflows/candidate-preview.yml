@@ -16,7 +16,7 @@ jobs:
   preview:
     if: github.repository == 'alx-mzy/CyIME'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     steps:
       - name: Checkout feature branch
         uses: actions/checkout@v7
@@ -52,6 +52,7 @@ jobs:
             app/src/main/jniLibs
             app/.cxx
             app/build/speech-runtime
+            app/build/onnxruntime-android-*.aar
             ~/.android/debug.keystore
           key: candidate-arm64-${{ runner.os }}-${{ hashFiles('app/build-logic/*.gradle.kts', 'app/src/main/jni/CMakeLists.txt') }}
           restore-keys: |
