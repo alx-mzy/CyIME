@@ -1,0 +1,86 @@
+name: Candidate ARM64 Lite Preview
+
+on:
+  push:
+    branches: [feat/candidate-comment-below]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lite-preview
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: github.repository == 'alx-mzy/CyIME'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up JDK 17 and Gradle cache
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - name: Install NDK and native build tools
+        run: |
+          sdkmanager "ndk;29.0.14206865"
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Cache native dependencies and ARM64 intermediates
+        uses: actions/cache@v6
+        with:
+          path: |
+            app/src/main/jni/onnxruntime
+            app/src/main/jni/boost
+            app/src/main/jni/boost-*.tar.xz
+            app/src/main/jniLibs
+            app/.cxx
+            app/build/speech-runtime
+            ~/.android/debug.keystore
+          key: candidate-arm64-${{ runner.os }}-${{ hashFiles('app/build-logic/*.gradle.kts', 'app/src/main/jni/CMakeLists.txt') }}
+          restore-keys: |
+            candidate-arm64-${{ runner.os }}-
+
+      - name: Build one ARM64 lightweight debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug -PcandidatePreview=true -PbundleModels=false --no-daemon --max-workers=2 --console=plain
+
+      - name: Verify one APK and preview identity
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, subprocess
+          apks = list(Path('app/build/outputs/apk/debug').glob('*.apk'))
+          assert len(apks) == 1, f'Expected one APK, found {apks}'
+          apk = apks[0]
+          assert 'arm64-v8a' in apk.name, apk.name
+          analyzer = Path(os.environ['ANDROID_HOME']) / 'cmdline-tools/latest/bin/apkanalyzer'
+          app_id = subprocess.check_output([str(analyzer), 'manifest', 'application-id', str(apk)], text=True).strip()
+          assert app_id == 'com.cyletix.cyime.commenttest', app_id
+          print(f'Preview: {apk.name}; ID: {app_id}; bytes: {apk.stat().st_size}')
+          PY
+
+      - name: Upload only the preview APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: CyIME-comment-test-arm64-lite
+          path: app/build/outputs/apk/debug/*arm64-v8a.apk
+          if-no-files-found: error
+          retention-days: 7

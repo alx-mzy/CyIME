@@ -65,6 +65,11 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
+// Opt-in, fork-only UI preview; ordinary upstream builds retain their existing defaults.
+val candidatePreview = providers.gradleProperty("candidatePreview").orNull == "true"
+val candidateBuildAbis = if (candidatePreview) listOf("arm64-v8a")
+    else listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+
 android {
     namespace = "com.kingzcheung.xime"
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/plugin-market-assets").get().asFile)
@@ -115,7 +120,7 @@ android {
 
         // NDK 配置
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            abiFilters += candidateBuildAbis
         }
 
         // 构建信息
@@ -156,6 +161,10 @@ android {
 
     buildTypes {
         debug {
+            if (candidatePreview) {
+                applicationIdSuffix = ".commenttest"
+                resValue("string", "app_name", "CyIME 注释测试")
+            }
             // 本地有正式密钥时沿用它，debug/release 都能覆盖原应用，避免卸载丢数据。
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
@@ -283,10 +292,10 @@ android {
     // 分架构打包
     splits {
         abi {
-            isEnable = true
+            isEnable = !candidatePreview
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-            isUniversalApk = true
+            if (!candidatePreview) include(*candidateBuildAbis.toTypedArray())
+            isUniversalApk = !candidatePreview
         }
     }
 }
@@ -294,7 +303,8 @@ android {
 android.applicationVariants.all {
     val appName = "CyIME"
     outputs.all {
-        val abi = filters.find { it.filterType.toString() == "ABI" }?.identifier ?: "universal"
+        val abi = if (candidatePreview) "arm64-v8a"
+            else filters.find { it.filterType.toString() == "ABI" }?.identifier ?: "universal"
         val buildLabel = if (buildType.name == "debug") "-debug" else ""
         val edition = if (providers.gradleProperty("bundleModels").orNull == "true") "-full" else ""
         (this as BaseVariantOutputImpl).outputFileName = "$appName-$versionName$edition$buildLabel-$abi.apk"
